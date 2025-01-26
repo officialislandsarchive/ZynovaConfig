@@ -1,0 +1,259 @@
+local r = game:GetService("ReplicatedStorage")
+local w = game:GetService("Workspace")
+local rs = game:GetService("RunService")
+local p = game:GetService("Players").LocalPlayer
+local cf = "ZynovaCONFIG"
+
+local function gcf()
+    local f = r:FindFirstChild(cf)
+    if not f then
+        f = Instance.new("Folder")
+        f.Name = cf
+        f.Parent = r
+    end
+    return f
+end
+
+local bossIds = {
+    ["Island 1"] = {
+        ["Ancient Gladiator"] = { 
+            Id = 101002, 
+            Location = { 38.12, 100.37, -309.53 }, 
+            Difficulty = "Starter" 
+        },
+        ["Holy Sect Exile"] = { 
+            Id = 101003, 
+            Location = { 14.10, 100.37, -309.01 }, 
+            Difficulty = "Medium" 
+        },
+        ["Sacrificial Piece"] = { 
+            Id = 101004, 
+            Location = { -15.49, 100.37, -310.10 }, 
+            Difficulty = "Hard" 
+        },
+        ["Mechanical Minion"] = { 
+            Id = 101005, 
+            Location = { -37.56, 100.37, -309.54 }, 
+            Difficulty = "Extreme" 
+        },
+        ["Blade"] = { 
+            Id = 101006, 
+            Location = { -1.08, 102.04, -282.64 }, 
+            Difficulty = "Final Boss" 
+        }
+    },
+    ["Island 2"] = {
+        ["Jungle Hunter"] = { 
+            Id = 101007, 
+            Location = { -718.06, 55.85, 1272.00 }, 
+            Difficulty = "Starter" 
+        },
+        ["Dual Edge Specter"] = { 
+            Id = 101008, 
+            Location = { -782.24, 56.09, 1321.91 }, 
+            Difficulty = "Medium" 
+        },
+        ["Rock Golem Sentinel"] = { 
+            Id = 101009, 
+            Location = { -826.70, 59.67, 1408.19 }, 
+            Difficulty = "Hard" 
+        },
+        ["Marooned Cavalier"] = { 
+            Id = 101010, 
+            Location = { -924.23, 56.78, 1385.65 }, 
+            Difficulty = "Extreme" 
+        },
+        ["Woodland Sovereign"] = { 
+            Id = 101011, 
+            Location = { -1041.97, 54.81, 1324.87 }, 
+            Difficulty = "Final Boss" 
+        },
+        ["Cannibal Shaman"] = { 
+            Id = 101012, 
+            Location = { -891.35, 61.08, 1481.01 }, 
+            Difficulty = "Secret Challenge" 
+        }
+    },
+    ["Island 3"] = {
+        ["Deep Sea Undead"] = { 
+            Id = 101013, 
+            Location = { 1773.87, -132.80, 2860.51 }, 
+            Difficulty = "Starter" 
+        },
+        ["Guardian Priest"] = { 
+            Id = 101014, 
+            Location = { 1380.68, -125.77, 2808.35 }, 
+            Difficulty = "Medium" 
+        },
+        ["Advanced Mecha MKII"] = { 
+            Id = 101015, 
+            Location = { 2011.13, -128.93, 2760.34 }, 
+            Difficulty = "Hard" 
+        },
+        ["Abyssal High Priest"] = { 
+            Id = 101016, 
+            Location = { 1363.40, -126.52, 2823.81 }, 
+            Difficulty = "Extreme" 
+        },
+        ["Prototype Zero"] = { 
+            Id = 101017, 
+            Location = { 2019.57, -64.02, 2814.30 }, 
+            Difficulty = "Final Boss" 
+        }
+    }
+}
+
+local function cu(b, n, id, loc, diff, cd, vis)
+    local bf = b:FindFirstChild(n) or Instance.new("Folder")
+    bf.Name = n
+    bf.Parent = b
+
+    local iv = bf:FindFirstChild("Id") or Instance.new("IntValue")
+    iv.Name = "Id"
+    iv.Value = id
+    iv.Parent = bf
+
+    local lv = bf:FindFirstChild("Location") or Instance.new("Vector3Value")
+    lv.Name = "Location"
+    lv.Value = Vector3.new(unpack(loc))
+    lv.Parent = bf
+
+    local dv = bf:FindFirstChild("Difficulty") or Instance.new("StringValue")
+    dv.Name = "Difficulty"
+    dv.Value = diff
+    dv.Parent = bf
+
+    local cv = bf:FindFirstChild("Cooldown") or Instance.new("StringValue")
+    cv.Name = "Cooldown"
+    cv.Value = tostring(cd)
+    cv.Parent = bf
+
+    local vv = bf:FindFirstChild("Visible") or Instance.new("BoolValue")
+    vv.Name = "Visible"
+    vv.Value = vis
+    vv.Parent = bf
+end
+
+local function ct(t)
+    local m, s = t:match("(%d+):(%d+)")
+    return m and s and tonumber(m) * 60 + tonumber(s) or tonumber(t) or "null"
+end
+
+local function findNPC(npcs, target)
+    for _, npc in ipairs(npcs:GetChildren()) do
+        if npc:IsA("Model") and npc.Name == target then
+            return npc
+        end
+    end
+    return nil
+end
+
+local function trackStage()
+    local gui = p:FindFirstChild("PlayerGui")
+    if not gui then return "None", false, false end
+
+    local func = gui:FindFirstChild("Main") and gui.Main:FindFirstChild("Func")
+    if not func then return "None", false, false end
+
+    local reg = func:FindFirstChild("Region")
+    if not reg or not reg.Visible then return "None", false, true end
+
+    local s, b = "None", false
+    if reg:FindFirstChild("Normal") and reg.Normal.Visible then
+        local tl = reg.Normal.Frame.TextLabel
+        s = tl and tl.Text or s
+    elseif reg:FindFirstChild("Boss") and reg.Boss.Visible then
+        local tl = reg.Boss.Frame.TextLabel
+        s, b = tl and tl.Text or "Boss", true
+    end
+
+    return s, b, false
+end
+
+local function fastCountNPCs()
+    local e = w:FindFirstChild("Enemy")
+    if not e then return 0 end
+
+    local count = 0
+    for _, obj in ipairs(e:GetChildren()) do
+        if obj:IsA("Model") and not (obj.Name == "Animation" or obj.Name == "Event") then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                count += 1
+            end
+        end
+    end
+    return count
+end
+
+local function fastFindBoss()
+    local e = w:FindFirstChild("Enemy")
+    if not e then return 0 end
+
+    for _, m in ipairs(e:GetChildren()) do
+        if m:IsA("Model") then
+            local hum = m:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                return 1
+            end
+        end
+    end
+    return 0
+end
+
+local function update()
+    local cf = gcf()
+    local npcs = w:FindFirstChild("NPCs")
+    if not npcs then return end
+
+    for island, bosses in pairs(bossIds) do
+        local ifolder = cf:FindFirstChild(island) or Instance.new("Folder")
+        ifolder.Name = island
+        ifolder.Parent = cf
+
+        for name, data in pairs(bosses) do
+            local c, v = "null", false
+            local npc = findNPC(npcs, name)
+
+            if npc then
+                local hrp = npc:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local bg = hrp:FindFirstChild("BillboardGui")
+                    if bg then
+                        local cd = bg.Frame.CD
+                        if cd and cd:IsA("TextLabel") then
+                            c, v = ct(cd.Text), true
+                        end
+                    end
+                end
+            end
+
+            cu(ifolder, name, data.Id, data.Location, data.Difficulty, c, v)
+        end
+    end
+
+    local stage, isBoss, outOfRound = trackStage()
+    local bossCount = outOfRound and 0 or (isBoss and fastFindBoss() or 0)
+    local npcCount = bossCount == 1 and 0 or (outOfRound and 0 or fastCountNPCs())
+
+    local sf = cf:FindFirstChild("Developer") or Instance.new("Folder")
+    sf.Name = "Developer"
+    sf.Parent = cf
+
+    local st = sf:FindFirstChild("Current") or Instance.new("StringValue")
+    st.Name = "Current"
+    st.Value = outOfRound and "None" or stage
+    st.Parent = sf
+
+    local nc = sf:FindFirstChild("NPCs") or Instance.new("IntValue")
+    nc.Name = "NPCs"
+    nc.Value = npcCount
+    nc.Parent = sf
+
+    local bc = sf:FindFirstChild("Boss") or Instance.new("IntValue")
+    bc.Name = "Boss"
+    bc.Value = bossCount
+    bc.Parent = sf
+end
+
+rs.Heartbeat:Connect(update)
