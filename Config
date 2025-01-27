@@ -16,96 +16,112 @@ end
 
 local bossIds = {
     ["Island 1"] = {
-        ["Ancient Gladiator"] = { 
+        ["Starter"] = { 
             Id = 101002, 
             Location = { 38.12, 100.37, -309.53 }, 
-            Difficulty = "Starter" 
+            Name = "Ancient Gladiator", 
+            CooldownDefault = 60 
         },
-        ["Holy Sect Exile"] = { 
+        ["Medium"] = { 
             Id = 101003, 
             Location = { 14.10, 100.37, -309.01 }, 
-            Difficulty = "Medium" 
+            Name = "Holy Sect Exile", 
+            CooldownDefault = 90
         },
-        ["Sacrificial Piece"] = { 
+        ["Hard"] = { 
             Id = 101004, 
             Location = { -15.49, 100.37, -310.10 }, 
-            Difficulty = "Hard" 
+            Name = "Sacrificial Piece", 
+            CooldownDefault = 120 
         },
-        ["Mechanical Minion"] = { 
+        ["Extreme"] = { 
             Id = 101005, 
             Location = { -37.56, 100.37, -309.54 }, 
-            Difficulty = "Extreme" 
+            Name = "Mechanical Minion", 
+            CooldownDefault = 150 
         },
-        ["Blade"] = { 
+        ["Final Boss"] = { 
             Id = 101006, 
             Location = { -1.08, 102.04, -282.64 }, 
-            Difficulty = "Final Boss" 
+            Name = "Blade", 
+            CooldownDefault = 180 
         }
     },
     ["Island 2"] = {
-        ["Jungle Hunter"] = { 
+        ["Starter"] = { 
             Id = 101007, 
             Location = { -718.06, 55.85, 1272.00 }, 
-            Difficulty = "Starter" 
+            Name = "Jungle Hunter", 
+            CooldownDefault = 180
         },
-        ["Dual Edge Specter"] = { 
+        ["Medium"] = { 
             Id = 101008, 
             Location = { -782.24, 56.09, 1321.91 }, 
-            Difficulty = "Medium" 
+            Name = "Dual Edge Specter", 
+            CooldownDefault = 180 
         },
-        ["Rock Golem Sentinel"] = { 
+        ["Hard"] = { 
             Id = 101009, 
             Location = { -826.70, 59.67, 1408.19 }, 
-            Difficulty = "Hard" 
+            Name = "Rock Golem Sentinel", 
+            CooldownDefault = 240 
         },
-        ["Marooned Cavalier"] = { 
+        ["Extreme"] = { 
             Id = 101010, 
             Location = { -924.23, 56.78, 1385.65 }, 
-            Difficulty = "Extreme" 
+            Name = "Marooned Cavalier", 
+            CooldownDefault = 300 
         },
-        ["Woodland Sovereign"] = { 
+        ["Final Boss"] = { 
             Id = 101011, 
             Location = { -1041.97, 54.81, 1324.87 }, 
-            Difficulty = "Final Boss" 
+            Name = "Woodland Sovereign", 
+            CooldownDefault = 360 
         },
-        ["Cannibal Shaman"] = { 
+        ["Secret Challenge"] = { 
             Id = 101012, 
             Location = { -891.35, 61.08, 1481.01 }, 
-            Difficulty = "Secret Challenge" 
+            Name = "Cannibal Shaman", 
+            CooldownDefault = 420 
         }
     },
     ["Island 3"] = {
-        ["Deep Sea Undead"] = { 
+        ["Starter"] = { 
             Id = 101013, 
             Location = { 1773.87, -132.80, 2860.51 }, 
-            Difficulty = "Starter" 
+            Name = "Deep Sea Undead", 
+            CooldownDefault = 180 
         },
-        ["Guardian Priest"] = { 
+        ["Medium"] = { 
             Id = 101014, 
             Location = { 1380.68, -125.77, 2808.35 }, 
-            Difficulty = "Medium" 
+            Name = "Guardian Priest", 
+            CooldownDefault = 240 
         },
-        ["Advanced Mecha MKII"] = { 
+        ["Hard"] = { 
             Id = 101015, 
             Location = { 2011.13, -128.93, 2760.34 }, 
-            Difficulty = "Hard" 
+            Name = "AdvancedMecha", 
+            CooldownDefault = 300
         },
-        ["Abyssal High Priest"] = { 
+        ["Extreme"] = { 
             Id = 101016, 
             Location = { 1363.40, -126.52, 2823.81 }, 
-            Difficulty = "Extreme" 
+            Name = "Abyssal High Priest", 
+            CooldownDefault = 360 
         },
-        ["Prototype Zero"] = { 
+        ["Final Boss"] = { 
             Id = 101017, 
             Location = { 2019.57, -64.02, 2814.30 }, 
-            Difficulty = "Final Boss" 
+            Name = "Prototype Zero", 
+            CooldownDefault = 420 
         }
     }
 }
 
-local function cu(b, n, id, loc, diff, cd, vis)
-    local bf = b:FindFirstChild(n) or Instance.new("Folder")
-    bf.Name = n
+local function cu(b, diff, id, loc, name, cd, vis, cdDefault)
+    local bf = b:FindFirstChild(diff) or Instance.new("Folder")
+    bf.Name = diff
     bf.Parent = b
 
     local iv = bf:FindFirstChild("Id") or Instance.new("IntValue")
@@ -118,15 +134,20 @@ local function cu(b, n, id, loc, diff, cd, vis)
     lv.Value = Vector3.new(unpack(loc))
     lv.Parent = bf
 
-    local dv = bf:FindFirstChild("Difficulty") or Instance.new("StringValue")
-    dv.Name = "Difficulty"
-    dv.Value = diff
-    dv.Parent = bf
+    local nv = bf:FindFirstChild("Name") or Instance.new("StringValue")
+    nv.Name = "Name"
+    nv.Value = name
+    nv.Parent = bf
 
     local cv = bf:FindFirstChild("Cooldown") or Instance.new("StringValue")
     cv.Name = "Cooldown"
     cv.Value = tostring(cd)
     cv.Parent = bf
+
+    local cdv = bf:FindFirstChild("CooldownDefault") or Instance.new("IntValue")
+    cdv.Name = "CooldownDefault"
+    cdv.Value = cdDefault
+    cdv.Parent = bf
 
     local vv = bf:FindFirstChild("Visible") or Instance.new("BoolValue")
     vv.Name = "Visible"
@@ -211,9 +232,9 @@ local function update()
         ifolder.Name = island
         ifolder.Parent = cf
 
-        for name, data in pairs(bosses) do
+        for diff, data in pairs(bosses) do
             local c, v = "null", false
-            local npc = findNPC(npcs, name)
+            local npc = findNPC(npcs, data.Name)
 
             if npc then
                 local hrp = npc:FindFirstChild("HumanoidRootPart")
@@ -228,7 +249,7 @@ local function update()
                 end
             end
 
-            cu(ifolder, name, data.Id, data.Location, data.Difficulty, c, v)
+            cu(ifolder, diff, data.Id, data.Location, data.Name, c, v, data.CooldownDefault)
         end
     end
 
