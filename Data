@@ -1,0 +1,158 @@
+local rs = game:GetService("RunService")
+local r = game:GetService("ReplicatedStorage")
+local p = game.Players.LocalPlayer
+local pg = p:WaitForChild("PlayerGui")
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "ZynovaHubUI"
+sg.ResetOnSpawn = false
+sg.Parent = pg
+
+local function createFrame(size, pos, color, parent)
+    local f = Instance.new("Frame")
+    f.Size = size
+    f.Position = pos
+    f.BackgroundColor3 = color or Color3.fromRGB(30, 30, 30)
+    f.BackgroundTransparency = 0.2
+    f.BorderSizePixel = 0
+    f.Parent = parent
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
+    return f
+end
+
+local function createText(txt, size, color, parent, align)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, 0, 0, 30)
+    l.BackgroundTransparency = 1
+    l.Text = txt
+    l.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+    l.Font = Enum.Font.GothamBold
+    l.TextSize = size or 16
+    l.TextXAlignment = align or Enum.TextXAlignment.Left
+    l.Parent = parent
+    return l
+end
+
+local function createTabButton(txt, parent)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0.5, 0, 0, 35)
+    b.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    b.Text = txt
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 14
+    b.Parent = parent
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    return b
+end
+
+local function createScrollingFrame(parent)
+    local s = Instance.new("ScrollingFrame")
+    s.Size = UDim2.new(1, 0, 1, -40)
+    s.Position = UDim2.new(0, 0, 0, 40)
+    s.CanvasSize = UDim2.new(0, 0, 0, 0)
+    s.ScrollBarThickness = 4
+    s.BackgroundTransparency = 1
+    s.Parent = parent
+    local l = Instance.new("UIListLayout", s)
+    l.Padding = UDim.new(0, 5)
+    l.SortOrder = Enum.SortOrder.LayoutOrder
+    s.ChildAdded:Connect(function()
+        s.CanvasSize = UDim2.new(0, 0, 0, l.AbsoluteContentSize.Y + 10)
+    end)
+    return s
+end
+
+local mf = createFrame(UDim2.new(0, 550, 0, 550), UDim2.new(0.5, -275, 0.5, -275), Color3.fromRGB(25, 25, 25), sg)
+local header = createFrame(UDim2.new(1, 0, 0, 40), UDim2.new(0, 0, 0, 0), Color3.fromRGB(30, 30, 30), mf)
+createText("Zynova Hub", 20, Color3.fromRGB(255, 255, 255), header)
+
+local closeButton = Instance.new("TextButton", header)
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 16
+Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
+
+closeButton.MouseButton1Click:Connect(function()
+    sg.Enabled = false
+end)
+
+local tabs = createFrame(UDim2.new(1, 0, 0, 35), UDim2.new(0, 0, 0, 40), Color3.fromRGB(40, 40, 40), mf)
+local devTab = createTabButton("Developer Info", tabs)
+local bossTab = createTabButton("Boss List", tabs)
+bossTab.Position = UDim2.new(0.5, 0, 0, 0)
+
+local devPanel = createFrame(UDim2.new(1, 0, 1, -80), UDim2.new(0, 0, 0, 75), Color3.fromRGB(20, 20, 20), mf)
+local bossPanel = createFrame(UDim2.new(1, 0, 1, -80), UDim2.new(0, 0, 0, 75), Color3.fromRGB(20, 20, 20), mf)
+bossPanel.Visible = false
+
+local devScroll = createScrollingFrame(devPanel)
+local bossScroll = createScrollingFrame(bossPanel)
+
+local function updateDevInfo()
+    for _, v in ipairs(devScroll:GetChildren()) do if not v:IsA("UIListLayout") then v:Destroy() end end
+    local zc = r:FindFirstChild("ZynovaCONFIG")
+    if not zc then
+        createText("ZynovaCONFIG not found!", 14, Color3.fromRGB(255, 70, 70), devScroll)
+        return
+    end
+
+    local dev = zc:FindFirstChild("Developer")
+    if dev then
+        for _, v in ipairs(dev:GetChildren()) do
+            if v:IsA("ValueBase") then
+                createText(v.Name .. ": " .. tostring(v.Value), 14, Color3.fromRGB(180, 180, 255), devScroll)
+            end
+        end
+    end
+end
+
+local function updateBossInfo()
+    for _, v in ipairs(bossScroll:GetChildren()) do if not v:IsA("UIListLayout") then v:Destroy() end end
+    local zc = r:FindFirstChild("ZynovaCONFIG")
+    if not zc then
+        createText("ZynovaCONFIG not found!", 14, Color3.fromRGB(255, 70, 70), bossScroll)
+        return
+    end
+
+    for _, isl in ipairs(zc:GetChildren()) do
+        if isl:IsA("Folder") and isl.Name ~= "Developer" then
+            createText(isl.Name, 18, Color3.fromRGB(255, 170, 0), bossScroll)
+
+            for _, boss in ipairs(isl:GetChildren()) do
+                if boss:IsA("Folder") then
+                    local div = createFrame(UDim2.new(1, 0, 0, 2), UDim2.new(0, 0, 0, 0), Color3.fromRGB(60, 60, 60), bossScroll)
+                    local data = {}
+                    for _, v in ipairs(boss:GetChildren()) do
+                        if v:IsA("ValueBase") then
+                            table.insert(data, "  - " .. v.Name .. ": " .. tostring(v.Value))
+                        end
+                    end
+                    createText(boss.Name, 17, Color3.fromRGB(200, 200, 200), bossScroll)
+                    for _, line in ipairs(data) do
+                        createText(line, 14, Color3.fromRGB(220, 220, 220), bossScroll)
+                    end
+                end
+            end
+        end
+    end
+end
+
+devTab.MouseButton1Click:Connect(function()
+    devPanel.Visible = true
+    bossPanel.Visible = false
+    updateDevInfo()
+end)
+
+bossTab.MouseButton1Click:Connect(function()
+    devPanel.Visible = false
+    bossPanel.Visible = true
+    updateBossInfo()
+end)
+
+updateDevInfo()
+updateBossInfo()
