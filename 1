@@ -1,0 +1,169 @@
+repeat wait() until game:IsLoaded()
+
+local v = "V1"
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+local mainScript = loadstring(game:HttpGet("https://raw.githubusercontent.com/officialislandsarchive/test2rf/main/main.lua"))()
+local saveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/officialislandsarchive/test2rf/main/SaveManager.lua"))()
+local interfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/officialislandsarchive/test2rf/main/InterfaceManager.lua"))()
+
+local autoFarmEnabled = false
+local selectedIsland = nil
+local selectedDifficulties = {}
+
+local function getZynovaData()
+    local cf = game:GetService("ReplicatedStorage"):FindFirstChild("ZynovaCONFIG")
+    if not cf then return nil end
+    return cf
+end
+
+local function trackStage()
+    local gui = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if not gui then return "None", false end
+
+    local func = gui:FindFirstChild("Main") and gui.Main:FindFirstChild("Func")
+    if not func then return "None", false end
+
+    local reg = func:FindFirstChild("Region")
+    if not reg or not reg.Visible then return "None", false end
+
+    if reg:FindFirstChild("Normal") and reg.Normal.Visible then
+        local tl = reg.Normal.Frame.TextLabel
+        return tl and tl.Text or "None", false
+    elseif reg:FindFirstChild("Boss") and reg.Boss.Visible then
+        local tl = reg.Boss.Frame.TextLabel
+        return tl and tl.Text or "Boss", true
+    end
+
+    return "None", false
+end
+
+local function getBossData(island, difficulty)
+    local zynovaData = getZynovaData()
+    if not zynovaData then return nil end
+
+    local islandFolder = zynovaData:FindFirstChild(island)
+    if not islandFolder then return nil end
+
+    for _, boss in ipairs(islandFolder:GetChildren()) do
+        if boss:IsA("Folder") and boss:FindFirstChild("Difficulty") and boss.Difficulty.Value == difficulty then
+            return {
+                Id = boss:FindFirstChild("Id").Value,
+                Name = boss.Name
+            }
+        end
+    end
+    return nil
+end
+
+local function killNPCs()
+    local enemyFolder = workspace:FindFirstChild("Enemy")
+    if not enemyFolder then return end
+
+    for _, npc in ipairs(enemyFolder:GetChildren()) do
+        if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc:FindFirstChild("HumanoidRootPart") then
+            local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                while npc.Humanoid.Health > 0 and autoFarmEnabled do
+                    hrp.CFrame = CFrame.lookAt(hrp.Position, npc.HumanoidRootPart.Position) * CFrame.new(0, 0, -5)
+                    mouse1click()
+                    task.wait(0.1)
+                end
+            end
+        end
+    end
+end
+
+local function startDungeon(difficulty)
+    local zynovaData = getZynovaData()
+    if not zynovaData or not selectedIsland then return end
+
+    local bossData = getBossData(selectedIsland, difficulty)
+    if not bossData then return end
+
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    if replicatedStorage and replicatedStorage:FindFirstChild("Remotes") and replicatedStorage.Remotes:FindFirstChild("Region") then
+        replicatedStorage.Remotes.Region.EnterRegion:FireServer(bossData.Id)
+
+        while autoFarmEnabled do
+            local stage, isBoss = trackStage()
+            if stage ~= "None" then
+                killNPCs()
+                if stage == "Boss" and isBoss then
+                    break
+                end
+            end
+            task.wait(1)
+        end
+    end
+end
+
+local function autoFarm()
+    while autoFarmEnabled do
+        if not selectedIsland then break end
+        if type(selectedDifficulties) ~= "table" or #selectedDifficulties == 0 then break end
+
+        for _, difficulty in ipairs(selectedDifficulties) do
+            startDungeon(difficulty)
+            if not autoFarmEnabled then break end
+        end
+        task.wait(1)
+    end
+end
+
+local window = mainScript:CreateWindow({
+    Title = "Zynova Hub" .. v,
+    SubTitle = "Made by Albert",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local tabs = {
+    AutoFarm = window:AddTab({ Title = "Auto Farm", Icon = "carrot" }),
+    Settings = window:AddTab({ Title = "Settings", Icon = "settings" }),
+}
+
+local autoFarmTab = tabs.AutoFarm:AddSection("Auto Farm Dungeon")
+
+autoFarmTab:AddDropdown("IslandDropdown", {
+    Title = "Select Island",
+    Description = "Select the island you want to fight at.",
+    Values = { "Island 1", "Island 2", "Island 3" },
+    Default = "Island 1",
+    Callback = function(value)
+        selectedIsland = value
+    end
+})
+
+autoFarmTab:AddDropdown("DifficultyDropdown", {
+    Title = "Select Difficulty",
+    Description = "Select the difficulty of the dungeon.",
+    Values = { "Starter", "Medium", "Hard", "Extreme", "Final Boss" },
+    Multi = true,
+    Default = { "Starter" },
+    Callback = function(values)
+        selectedDifficulties = values and #values > 0 and values or { "Starter" }
+    end
+})
+
+autoFarmTab:AddToggle("Auto Farm", {
+    Title = "Auto Farm",
+    Default = false,
+    Callback = function(value)
+        autoFarmEnabled = value
+        if autoFarmEnabled then
+            task.spawn(autoFarm)
+        end
+    end
+})
+
+saveManager:SetLibrary(mainScript)
+interfaceManager:SetLibrary(mainScript)
+saveManager:SetFolder("ZynovahubFREE/Lootify")
+interfaceManager:SetFolder("ZynovahubFREE/Lootify")
+interfaceManager:BuildInterfaceSection(tabs.Settings)
+saveManager:BuildConfigSection(tabs.Settings)
+window:SelectTab(1)
+saveManager:LoadAutoloadConfig()
