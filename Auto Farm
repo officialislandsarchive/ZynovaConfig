@@ -1,0 +1,282 @@
+repeat wait() until game:IsLoaded()
+
+local v = "V2"
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+local mainScript = loadstring(game:HttpGet("https://raw.githubusercontent.com/officialislandsarchive/test2rf/main/main.lua"))()
+local saveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/officialislandsarchive/test2rf/main/SaveManager.lua"))()
+local interfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/officialislandsarchive/test2rf/main/InterfaceManager.lua"))()
+
+local autoFarmEnabled = false
+local selectedIsland = {}
+local selectedDifficulties = {}
+
+local function setupZynovaData()
+    local r = game:GetService("ReplicatedStorage")
+    local zData = r:FindFirstChild("ZynovaDATA") or Instance.new("Folder")
+    zData.Name = "ZynovaDATA"
+    zData.Parent = r
+
+    local function createFolder(name, defaultValues)
+        local f = zData:FindFirstChild(name) or Instance.new("Folder")
+        f.Name = name
+        f.Parent = zData
+        for _, v in ipairs(defaultValues) do
+            if not f:FindFirstChild(v) then
+                local val = Instance.new("StringValue")
+                val.Name = v
+                val.Value = v
+                val.Parent = f
+            end
+        end
+        return f
+    end
+
+    createFolder("Island", { "Island 1" })
+    createFolder("Difficulties", { "Starter" })
+end
+
+local function updateFolder(folder, values)
+    if not folder then return end
+    local existing = {}
+    for _, v in ipairs(folder:GetChildren()) do
+        if v:IsA("StringValue") then
+            existing[v.Name] = true
+        end
+    end
+    for _, v in ipairs(values) do
+        if not existing[v] then
+            local val = Instance.new("StringValue")
+            val.Name = v
+            val.Value = v
+            val.Parent = folder
+        end
+    end
+    for _, v in ipairs(folder:GetChildren()) do
+        if v:IsA("StringValue") and not table.find(values, v.Name) then
+            v:Destroy()
+        end
+    end
+end
+
+local function syncData()
+    local r = game:GetService("ReplicatedStorage")
+    local zData = r:FindFirstChild("ZynovaDATA")
+    if not zData then return end
+    updateFolder(zData:FindFirstChild("Island"), selectedIsland)
+    updateFolder(zData:FindFirstChild("Difficulties"), selectedDifficulties)
+end
+
+local function getValues(folder)
+    local values = {}
+    if folder then
+        for _, v in ipairs(folder:GetChildren()) do
+            if v:IsA("StringValue") then
+                table.insert(values, v.Value)
+            end
+        end
+    end
+    return values
+end
+
+local function loadData()
+    local r = game:GetService("ReplicatedStorage")
+    local zData = r:FindFirstChild("ZynovaDATA")
+    if zData then
+        selectedIsland = getValues(zData:FindFirstChild("Island"))
+        selectedDifficulties = getValues(zData:FindFirstChild("Difficulties"))
+    end
+end
+
+local function tweenToTarget(hrp, targetPos)
+    local tweenService = game:GetService("TweenService")
+    local tweenInfo = TweenInfo.new((hrp.Position - targetPos).Magnitude / 16, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+    local tween = tweenService:Create(hrp, tweenInfo, { CFrame = CFrame.new(targetPos) })
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+local function killNPCs()
+    local enemyFolder = workspace:FindFirstChild("Enemy")
+    if not enemyFolder then return end
+    for _, npc in ipairs(enemyFolder:GetChildren()) do
+        if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc:FindFirstChild("HumanoidRootPart") then
+            local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                while npc.Humanoid.Health > 0 and autoFarmEnabled do
+                    tweenToTarget(hrp, npc.HumanoidRootPart.Position - Vector3.new(0, 0, 5))
+                    mouse1click()
+                    task.wait(0.1)
+                end
+            end
+        end
+    end
+end
+
+local function getStage()
+    local r = game:GetService("ReplicatedStorage")
+    local zConfig = r:FindFirstChild("ZynovaCONFIG")
+    if not zConfig then return "None" end
+
+    local devFolder = zConfig:FindFirstChild("Developer")
+    if devFolder then
+        local currentRound = devFolder:FindFirstChild("Current")
+        if currentRound and currentRound:IsA("StringValue") then
+            return currentRound.Value
+        end
+    end
+    return "None"
+end
+
+local function waitForCooldown(island)
+    local r = game:GetService("ReplicatedStorage")
+    local zConfig = r:FindFirstChild("ZynovaCONFIG")
+    if not zConfig then return end
+
+    local islandFolder = zConfig:FindFirstChild(island)
+    if not islandFolder then return end
+
+    while true do
+        local allReady = true
+        for _, bossFolder in ipairs(islandFolder:GetChildren()) do
+            if bossFolder:IsA("Folder") then
+                local cooldown = bossFolder:FindFirstChild("Cooldown")
+                if cooldown and cooldown.Value ~= "null" then
+                    allReady = false
+                    break
+                end
+            end
+        end
+        if allReady then break end
+        task.wait(1)
+    end
+end
+
+local function joinDungeon(island, difficulty)
+    local r = game:GetService("ReplicatedStorage")
+    local zConfig = r:FindFirstChild("ZynovaCONFIG")
+    if not zConfig then return end
+
+    local islandFolder = zConfig:FindFirstChild(island)
+    if not islandFolder then return end
+
+    for _, bossFolder in ipairs(islandFolder:GetChildren()) do
+        if bossFolder:IsA("Folder") then
+            local diff = bossFolder:FindFirstChild("Difficulty")
+            local id = bossFolder:FindFirstChild("Id")
+
+            if diff and id and diff.Value == difficulty then
+                local args = { [1] = id.Value }
+                r.Remotes.Region.EnterRegion:FireServer(unpack(args))
+                print("Entered dungeon with ID:", id.Value)
+                return true
+            end
+        end
+    end
+    print("Dungeon not found for Island:", island, "Difficulty:", difficulty)
+    return false
+end
+
+local function autoFarm()
+    while autoFarmEnabled do
+        if #selectedIsland == 0 or #selectedDifficulties == 0 then break end
+        for _, island in ipairs(selectedIsland) do
+            for _, difficulty in ipairs(selectedDifficulties) do
+                print("Farming", island, difficulty)
+
+                local stage = getStage()
+                if stage == "None" then
+                    waitForCooldown(island)
+                    local success = joinDungeon(island, difficulty)
+                    if not success then break end
+                end
+
+                while true do
+                    stage = getStage()
+                    if stage == "None" then
+                        print("No active round. Waiting for cooldown...")
+                        waitForCooldown(island)
+                        break
+                    elseif stage == "Boss" or stage:match("%d+/%d+") then
+                        print("Current stage:", stage)
+                        killNPCs()
+                    else
+                        print("Stage unknown. Stopping auto farm.")
+                        break
+                    end
+                    task.wait(0.5)
+                end
+                if not autoFarmEnabled then break end
+            end
+            task.wait(1)
+        end
+    end
+end
+
+setupZynovaData()
+loadData()
+
+local window = mainScript:CreateWindow({
+    Title = "Zynova Hub" .. v,
+    SubTitle = "Made by Albert",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local tabs = {
+    AutoFarm = window:AddTab({ Title = "Auto Farm", Icon = "carrot" }),
+    Settings = window:AddTab({ Title = "Settings", Icon = "settings" }),
+}
+
+local autoFarmTab = tabs.AutoFarm:AddSection("Auto Farm Dungeon")
+
+autoFarmTab:AddDropdown("IslandDropdown", {
+    Title = "Select Island",
+    Description = "Select the islands to farm.",
+    Values = { "Island 1", "Island 2", "Island 3" },
+    Default = "Island 1",
+    Callback = function(values)
+        selectedIsland = { values }
+        syncData()
+    end
+})
+
+autoFarmTab:AddDropdown("DifficultyDropdown", {
+    Title = "Select Difficulty",
+    Description = "Select the dungeon difficulty.",
+    Values = { "Starter", "Medium", "Hard", "Extreme", "Final Boss", "Secret Challenge" },
+    Default = "Starter",
+    Callback = function(value)
+        selectedDifficulties = { value }
+        syncData()
+    end
+})
+autoFarmTab:AddToggle("Auto Farm", {
+    Title = "Auto Farm",
+    Default = false,
+    Callback = function(value)
+        autoFarmEnabled = value
+        if autoFarmEnabled then
+            task.spawn(autoFarm)
+        end
+    end
+})
+
+autoFarmTab:AddButton({
+    Title = "Print Selected Data",
+    Callback = function()
+        print("Selected Islands:", table.concat(selectedIsland, ", "))
+        print("Selected Difficulties:", table.concat(selectedDifficulties, ", "))
+    end
+})
+
+saveManager:SetLibrary(mainScript)
+interfaceManager:SetLibrary(mainScript)
+saveManager:SetFolder("ZynovahubFREE/Lootify")
+interfaceManager:SetFolder("ZynovahubFREE/Lootify")
+interfaceManager:BuildInterfaceSection(tabs.Settings)
+saveManager:BuildConfigSection(tabs.Settings)
+window:SelectTab(1)
+saveManager:LoadAutoloadConfig()
